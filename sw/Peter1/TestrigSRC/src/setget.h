@@ -24,6 +24,10 @@ typedef enum {
     rawGyY,
     rawGyZ,
     calcHeading,
+    calcSpeed,
+    calcDir,
+    calcXpos,
+    calcYpos,
     NUM_VARS
 } VarNames;
 
@@ -32,5 +36,7 @@ void globalVar_init(void);
 void globalVar_set(VarNames varName, int value);
 int globalVar_get(VarNames varName);
 int globalVar_get(VarNames varName, long *age);
+int globalVar_get_delta(VarNames varName);
+int globalVar_get_TOT_delta(VarNames varName);
 
 #endif // GLOBAL_VAR_H

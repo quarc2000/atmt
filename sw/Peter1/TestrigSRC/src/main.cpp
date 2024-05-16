@@ -14,14 +14,18 @@
 #define TRIGGER_PIN4 19
 #define ECHO_PIN4 18
 
-//pins for motor driver L293
-//only using one motor as I am building this for servo steering
+// pins for motor driver L293
+// only using one motor as I am building this for servo steering
 const int enablePin = 2;
 const int input1Pin = 4;
 const int input2Pin = 5;
+const int enablePin2 = 33;
+const int input3Pin = 27;
+const int input4Pin = 23;
+
 // PWM settings
-const int freq = 5000; // Frequency for PWM signal
-const int resolution = 8; // Resolution for PWM signal
+const int freq = 5000;               // Frequency for PWM signal
+const int resolution = 8;            // Resolution for PWM signal
 const int channel1 = LEDC_CHANNEL_1; // Use channel 1 for forward direction
 const int channel2 = LEDC_CHANNEL_2; // Use channel 2 for backward direction
 
@@ -35,13 +39,13 @@ const int channel2 = LEDC_CHANNEL_2; // Use channel 2 for backward direction
 
 // Setting for the PWM signal to the servo
 #define LEDC_CHANNEL_0 0
-#define LEDC_TIMER_13_BIT 13
+// #define LEDC_TIMER_13_BIT 13
 #define LEDC_BASE_FREQ 50 // LEDC base frequency
 #define LEDC_GPIO 32      // The GPIO pin
-#define servo_adjust +150
-#define servo_neutral 1023 / 2 + servo_adjust
-#define servo_left servo_neutral - 70
-#define servo_right servo_neutral + 70
+#define servo_adjust 0
+#define servo_neutral 128 + servo_adjust
+#define servo_left (servo_neutral - 80)
+#define servo_right (servo_neutral + 80)
 
 volatile long distance[NUM_SENSORS];
 volatile long startTime[NUM_SENSORS];
@@ -51,45 +55,82 @@ volatile int currentSensor = 0;
 int triggerPins[NUM_SENSORS] = {TRIGGER_PIN, TRIGGER_PIN2, TRIGGER_PIN3, TRIGGER_PIN4};
 int echoPins[NUM_SENSORS] = {ECHO_PIN, ECHO_PIN2, ECHO_PIN3, ECHO_PIN4};
 
-void PWM_setup()
+void steer_setup()
 {
   // Setup timer and attach timer to a led pin
-  ledcSetup(LEDC_CHANNEL_0, LEDC_BASE_FREQ, LEDC_TIMER_13_BIT);
-  ledcAttachPin(LEDC_GPIO, LEDC_CHANNEL_0);
-  ledcWrite(LEDC_CHANNEL_0, 600);
+  /*ledcSetup(LEDC_CHANNEL_0, LEDC_BASE_FREQ, 8);
+  ledcAttachPin(LEDC_GPIO, 0);
+  ledcWrite(LEDC_CHANNEL_0, servo_neutral);
+  */
+  pinMode(enablePin2, OUTPUT);
+  pinMode(input3Pin, OUTPUT);
+  pinMode(input4Pin, OUTPUT);
 }
 
-
-
-void PWM_setDutyCycle(uint32_t dutyCycle)
+void steer_direction(int32_t steer) //+-100%, 0 = straight
 {
   // Set duty cycle
-  ledcWrite(LEDC_CHANNEL_0, dutyCycle);
+  // int value = map(dutyCycle, -100, 100, servo_left, servo_right);
+  // Serial.print("Steer:");
+  // erial.println(value);
+  if (steer <  0)
+  {
+
+    // LEFT
+    // ledcWrite(LEDC_CHANNEL_0, servo_neutral);
+    digitalWrite(input3Pin, HIGH);
+    digitalWrite(input4Pin, LOW);
+    digitalWrite(enablePin2, HIGH);
+  }
+  else if (steer > 0)
+  {
+    // RIGHT
+    // ledcWrite(LEDC_CHANNEL_0, value);
+    digitalWrite(input3Pin, LOW);
+    digitalWrite(input4Pin, HIGH);
+    digitalWrite(enablePin2, HIGH);
+  }
+  else
+  {
+
+    digitalWrite(enablePin2, LOW);
+  }
 }
 
-void MOTOR_setup() {
-    // Set up the motor control pins as outputs
+void MOTOR_setup()
+{
+  // Set up the motor control pins as outputs
   pinMode(enablePin, OUTPUT);
   pinMode(input1Pin, OUTPUT);
   pinMode(input2Pin, OUTPUT);
-
+  // ledcSetup(8, 5000, 8);
+  // ledcAttachPin(enablePin, 8);
 }
 
 //-100 = full speed in reverese, 100 full speed ahead. 0 is stop.
-void MOTOR_set_speed (int speed) {
-
-
-if (speed > 0) {
+void MOTOR_set_speed(int speed)
+{
+  int value = map(abs(speed), 0, 100, 0, 255);
+  if (speed > 0)
+  {
     // Forward direction
-    digitalWrite(enablePin, HIGH);
+    // digitalWrite(enablePin, HIGH);
     digitalWrite(input1Pin, HIGH);
     digitalWrite(input2Pin, LOW);
-  } else if (speed < 0) {
-    // Backward direction
+    // ledcWrite(8, value);
     digitalWrite(enablePin, HIGH);
-       digitalWrite(input1Pin, LOW);
+  }
+  else if (speed < 0)
+  {
+    // Backward direction
+    // digitalWrite(enablePin, HIGH);
+    digitalWrite(input1Pin, LOW);
     digitalWrite(input2Pin, HIGH);
-  } else {
+    digitalWrite(enablePin, HIGH);
+    // ledcWrite(8, value);
+  }
+  else
+  {
     // Stop the motor
     digitalWrite(enablePin, LOW);
   }
@@ -201,12 +242,12 @@ void SERVICE_readAccelerometer(void *pvParameters)
     int16_t Tmp = Wire.read() << 8 | Wire.read(); // 0x41 (TEMP_OUT_H) & 0x42 (TEMP_OUT_L)
     globalVar_set(rawTemp, Tmp / 34 + 365);
     int16_t GyX = Wire.read() << 8 | Wire.read(); // 0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
-    globalVar_set(rawGyX, GyX);
+    globalVar_set(rawGyX, GyX/13);
     int16_t GyY = Wire.read() << 8 | Wire.read(); // 0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
-    globalVar_set(rawGyY, GyY);
+    globalVar_set(rawGyY, GyY/13);
     int16_t GyZ = Wire.read() << 8 | Wire.read(); // 0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
-    globalVar_set(rawGyZ, GyZ);
-    vTaskDelay(pdMS_TO_TICKS(50));
+    globalVar_set(rawGyZ, GyZ/13);
+    vTaskDelay(pdMS_TO_TICKS(10));
   }
 }
 
@@ -225,7 +266,7 @@ void setup()
   Wire.write(0);
   Wire.endTransmission(true);
 
-  PWM_setup();
+  steer_setup();
   MOTOR_setup();
   MOTOR_set_speed(0);
 
@@ -247,14 +288,14 @@ void setup()
       NULL                 // Task handle
   );
 
-  xTaskCreate(
+  /*xTaskCreate(
       SERVICE_readCompass, // Task function
       "readcompass",       // Task name
       2000,                // Stack size (in words, not bytes)
       NULL,                // Task input parameter
       2,                   // Task priority
       NULL                 // Task handle
-  );
+  ); */
 
   xTaskCreate(
       SERVICE_readAccelerometer, // Task function
@@ -270,6 +311,7 @@ void loop()
 {
   // Empty. All the work is done in tasks.
   // Print the distance for debugging
+  /*
   Serial.print("Number of VARs: ");
   Serial.println(NUM_VARS);
   Serial.print("Left: ");
@@ -280,7 +322,7 @@ void loop()
   // Serial.print(distance[currentSensor]);
   Serial.print(globalVar_get(rawDistRight));
   Serial.print(" cm");
-    Serial.print("    Front: ");
+  Serial.print("    Front: ");
   // Serial.print(distance[currentSensor]);
   Serial.print(globalVar_get(rawDistFront));
   Serial.print(" cm");
@@ -301,15 +343,52 @@ void loop()
   Serial.print("   AZ:");
   Serial.println(globalVar_get(rawAccZ));
   Serial.print("Temp:");
-  Serial.println(globalVar_get(rawTemp));
+  Serial.println(globalVar_get(rawTemp));*/
   Serial.print("GX:");
-  Serial.print(globalVar_get(rawGyX));
+  Serial.print(globalVar_get(rawGyX)/131);
   Serial.print("   GY:");
-  Serial.print(globalVar_get(rawGyY));
+  Serial.print(globalVar_get(rawGyY)/131);
   Serial.print("   GZ:");
-  Serial.println(globalVar_get(rawGyZ));
+  Serial.println(globalVar_get(rawGyZ)/131);
   Serial.println();
-  PWM_setDutyCycle(random(servo_left, servo_right));
-  MOTOR_set_speed(random(-100,100));
-  vTaskDelay(pdMS_TO_TICKS(2100));
+  /*
+  // PWM_setDutyCycle(random(servo_left, servo_right));
+  // MOTOR_set_speed(100);
+  // vTaskDelay(pdMS_TO_TICKS(100));
+  if (globalVar_get(rawDistFront) < 30)
+  {
+    MOTOR_set_speed(0);
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    if (random(0, 2) == 0)
+    {
+      steer_direction(-100);
+    }
+    else
+    {
+      steer_direction(100);
+    }
+    MOTOR_set_speed(-100);
+    vTaskDelay(pdMS_TO_TICKS(2000));
+    MOTOR_set_speed(0);
+    vTaskDelay(pdMS_TO_TICKS(500));
+    steer_direction(0);
+    MOTOR_set_speed(100);
+  }
+  */
+  //steer_direction(100);
+  MOTOR_set_speed(100);
+
+  vTaskDelay(pdMS_TO_TICKS(20));
+  // random steering
+  //steer_direction(random(-100, 100));
+  int tmp = globalVar_get(rawGyZ);
+  if (tmp > 5 )  {
+    steer_direction(-50);
+} else if (tmp < -5) {
+    steer_direction(50);
+} else {
+  steer_direction(0);
 }
+
+//steer_direction(-100);
+};
