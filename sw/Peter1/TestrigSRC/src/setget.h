@@ -23,6 +23,7 @@ typedef enum {
     rawGyX,
     rawGyY,
     rawGyZ,
+    rawLidarFront,
     calcHeading,
     calcSpeed,
     calcDir,
@@ -35,6 +36,8 @@ typedef enum {
 void globalVar_init(void);
 void globalVar_set(VarNames varName, int value);
 int globalVar_get(VarNames varName);
+int globalVar_get_total(VarNames varName);
+void globalVar_reset_total(VarNames varName);
 int globalVar_get(VarNames varName, long *age);
 int globalVar_get_delta(VarNames varName);
 int globalVar_get_TOT_delta(VarNames varName);
